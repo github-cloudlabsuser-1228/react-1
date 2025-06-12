@@ -1,0 +1,49 @@
+name: Deploy to Azure
+
+on:
+  workflow_run:
+    workflows: ["Build React App"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: react-build
+          path: build
+
+      - name: 'Azure Login'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Example: Create a resource group (if it doesn't exist)
+      - name: 'Create Resource Group'
+        run: |
+          az group create --name contoso-rg --location uksouth
+
+      # Example: Create an Azure App Service plan (if it doesn't exist)
+      - name: 'Create App Service Plan'
+        run: |
+          az appservice plan create --name contoso-plan --resource-group contoso-rg --sku B1 --is-linux --location uksouth
+
+      # Example: Create a Web App (if it doesn't exist)
+      - name: 'Create REACT App'
+        run: |
+          az webapp create --resource-group contoso-rg --plan contoso-plan --name contoso-REACT-app-uksouth --runtime "NODE|18-lts" --deployment-local-git
+
+      # Deploy to Azure Web App
+      - name: 'Deploy to Azure Web App'
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: contoso-webapp-uksouth
+          slot-name: 'production'
+          package: ./build
